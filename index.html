@@ -3,14 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#0056b3">
     <title>Club Ratings</title>
     
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icon-192.png">
-
     <!-- CSS Libraries -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
@@ -18,27 +12,15 @@
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     
     <style>
-        body { background-color: #f0f2f5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding-bottom: 60px; }
+        body { background-color: #f0f2f5; font-family: -apple-system, sans-serif; padding-bottom: 60px; }
         #app-content { display: none; } 
-        
-        .navbar { background: linear-gradient(135deg, #0056b3, #004494); box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
-        .navbar-brand { font-weight: bold; letter-spacing: 0.5px; }
-        
-        .card { border-radius: 12px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; overflow: hidden; }
-        .nav-tabs .nav-link { border: none; color: #555; font-weight: 500; padding: 12px 20px; }
-        .nav-tabs .nav-link.active { color: #0056b3; border-bottom: 3px solid #0056b3; background: transparent; }
-        
-        table.dataTable thead th { background-color: #f8f9fa; color: #444; border-bottom: 2px solid #ddd; font-size: 0.9rem; }
-        .elo-badge { background-color: #e3f2fd; color: #0d47a1; font-weight: 800; padding: 4px 8px; border-radius: 6px; font-size: 0.95rem; }
-        .rank-cell { font-weight: bold; color: #666; }
-        
-        .vs-badge { width: 40px; height: 40px; background: #eee; color: #555; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin: 10px auto; }
-        
-        @media (max-width: 768px) {
-            .container { padding-left: 10px; padding-right: 10px; }
-            .nav-tabs .nav-link { padding: 10px; font-size: 0.9rem; }
-            h1, h3 { font-size: 1.5rem; }
-        }
+        .navbar { background: linear-gradient(135deg, #0056b3, #004494); }
+        .navbar-brand { font-weight: bold; color: white !important; }
+        .card { border-radius: 12px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .elo-badge { background-color: #e3f2fd; color: #0d47a1; font-weight: 800; padding: 4px 8px; border-radius: 6px; }
+        .rank-cell { font-weight: bold; color: #666; text-align: center; }
+        .vs-badge { width: 40px; height: 40px; background: #eee; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin: 0 auto; }
+        #data-error { display: none; background: #ffebee; color: #c62828; padding: 15px; border-radius: 8px; margin: 20px; text-align: center; border: 1px solid #ef9a9a; }
     </style>
 </head>
 <body>
@@ -47,9 +29,9 @@
     <div id="login-screen" class="d-flex align-items-center justify-content-center" style="height: 100vh; background: #e9ecef;">
         <div class="card p-4 text-center" style="max-width: 350px; width: 100%;">
             <h3 class="mb-3">🏓 Club Login</h3>
-            <input type="password" id="password-input" class="form-control mb-3" placeholder="Password" style="text-align: center;">
-            <button onclick="attemptLogin()" id="login-btn" class="btn btn-primary w-100 fw-bold">ENTER</button>
-            <p id="error-msg" class="text-danger mt-2 small" style="display:none;">Incorrect password</p>
+            <input type="password" id="password-input" class="form-control mb-3" placeholder="Password" style="text-align: center;" onkeydown="if(event.key==='Enter') checkPass()">
+            <button onclick="checkPass()" class="btn btn-primary w-100 fw-bold">ENTER</button>
+            <p id="pass-error" class="text-danger mt-2 small" style="display:none;">Incorrect password</p>
         </div>
     </div>
 
@@ -58,34 +40,30 @@
         <nav class="navbar navbar-dark mb-3">
             <div class="container d-flex justify-content-between">
                 <span class="navbar-brand">🏓 Club Ratings</span>
-                <span class="text-white-50 small" id="last-update"></span>
+                <span class="text-white-50 small" id="last-update">Loading...</span>
             </div>
         </nav>
 
-        <div class="container">
+        <!-- ERROR MESSAGE AREA -->
+        <div id="data-error">
+            <strong>Error:</strong> Could not find <code>ratings_data.json</code>.<br>
+            Please upload the data file to GitHub.
+        </div>
+
+        <div class="container" id="main-interface">
             <ul class="nav nav-tabs mb-3" id="myTab" role="tablist">
-                <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#rankings">🏆 Rankings</button></li>
-                <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#history">📈 History</button></li>
-                <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#forecast">🔮 Calculator</button></li>
+                <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#rankings">🏆 Rankings</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#history">📈 History</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#forecast">🔮 Calculator</button></li>
             </ul>
 
             <div class="tab-content">
-                
                 <!-- RANKINGS -->
                 <div class="tab-pane fade show active" id="rankings">
                     <div class="card p-2">
                         <table id="ratingTable" class="table table-hover dt-responsive nowrap" style="width:100%">
                             <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Player</th>
-                                    <th>Elo</th>
-                                    <th>Win %</th>
-                                    <th>Games</th>
-                                    <th>6m</th>
-                                    <th>1y</th>
-                                    <th>Last</th>
-                                </tr>
+                                <tr><th>#</th><th>Player</th><th>Elo</th><th>Win %</th><th>Games</th><th>6m</th><th>1y</th><th>Last</th></tr>
                             </thead>
                             <tbody></tbody>
                         </table>
@@ -97,9 +75,7 @@
                     <div class="card p-3">
                         <label class="form-label fw-bold">Select Players:</label>
                         <select id="player-select" class="form-control" multiple="multiple" style="width: 100%"></select>
-                        <div class="mt-3" style="position: relative; height: 400px; width: 100%;">
-                            <canvas id="historyChart"></canvas>
-                        </div>
+                        <div class="mt-3" style="height: 400px;"><canvas id="historyChart"></canvas></div>
                     </div>
                 </div>
 
@@ -126,26 +102,20 @@
                                 <div class="text-center mt-2 fw-bold text-primary" id="elo-p2">-</div>
                             </div>
                         </div>
-                        <div class="d-grid gap-2 mt-4">
-                            <button onclick="calculateWin()" class="btn btn-success fw-bold">PREDICT RESULT</button>
-                        </div>
+                        <div class="d-grid gap-2 mt-4"><button onclick="calculateWin()" class="btn btn-success fw-bold">PREDICT</button></div>
                         <div id="result-area" class="mt-4" style="display:none;">
-                            <h6 class="text-center text-muted mb-2">Match Win Probability</h6>
-                            <div class="progress" style="height: 25px; border-radius: 12px;">
-                                <div id="bar-p1" class="progress-bar bg-primary" role="progressbar" style="width: 50%"></div>
-                                <div id="bar-p2" class="progress-bar bg-warning" role="progressbar" style="width: 50%"></div>
+                            <div class="progress" style="height: 25px;">
+                                <div id="bar-p1" class="progress-bar bg-primary" style="width: 50%"></div>
+                                <div id="bar-p2" class="progress-bar bg-warning" style="width: 50%"></div>
                             </div>
                             <div class="d-flex justify-content-between mt-1 px-1">
                                 <span class="fw-bold text-primary" id="prob-p1">50%</span>
                                 <span class="fw-bold text-warning" id="prob-p2">50%</span>
                             </div>
-                            <hr>
-                            <h6 class="text-center text-muted">Most Likely Scores</h6>
-                            <ul class="list-group list-group-flush small" id="score-probs"></ul>
+                            <hr><ul class="list-group list-group-flush small" id="score-probs"></ul>
                         </div>
                     </div>
                 </div>
-
             </div>
         </div>
     </div>
@@ -166,103 +136,67 @@
         let GLOBAL_DATA = null;
         let CHART_INSTANCE = null;
 
-        // Allow Enter key to submit
-        document.getElementById("password-input").addEventListener("keypress", function(event) {
-            if (event.key === "Enter") {
-                event.preventDefault();
-                attemptLogin();
+        function checkPass() {
+            if(document.getElementById('password-input').value === CLUB_PASSWORD) {
+                document.getElementById('login-screen').style.display='none';
+                document.getElementById('app-content').style.display='block';
+                initApp();
+            } else {
+                document.getElementById('pass-error').style.display='block';
             }
-        });
-
-        function attemptLogin() {
-            const btn = document.getElementById('login-btn');
-            const pass = document.getElementById('password-input').value;
-            const err = document.getElementById('error-msg');
-
-            // 1. Check Password
-            if(pass !== CLUB_PASSWORD) {
-                err.style.display = 'block';
-                return;
-            }
-
-            // 2. UI Loading State
-            err.style.display = 'none';
-            btn.innerText = "Loading...";
-            btn.disabled = true;
-
-            // 3. Attempt Data Fetch
-            fetch('ratings_data.json')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error("HTTP error " + response.status);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    GLOBAL_DATA = data;
-                    // Success: Switch Screens
-                    document.getElementById('login-screen').style.display='none';
-                    document.getElementById('app-content').style.display='block';
-                    initApp();
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert("Login Successful, but cannot load 'ratings_data.json'.\n\nDid you upload the JSON file to GitHub?");
-                    // Reset button
-                    btn.innerText = "ENTER";
-                    btn.disabled = false;
-                });
         }
 
-        function initApp() {
-            document.getElementById('last-update').innerText = GLOBAL_DATA.meta.updated;
+        async function initApp() {
+            try {
+                // Force fresh load with timestamp
+                const res = await fetch('ratings_data.json?t=' + new Date().getTime());
+                if (!res.ok) throw new Error("File not found");
+                
+                GLOBAL_DATA = await res.json();
+                document.getElementById('last-update').innerText = "Updated: " + GLOBAL_DATA.meta.updated;
 
-            // 1. Setup Table
-            const tData = GLOBAL_DATA.leaderboard.map(p => [
-                "", 
-                p.name,
-                p.elo,
-                p.win_pct + "%",
-                p.games,
-                p.games_6m,
-                p.games_1y,
-                p.last_match
-            ]);
-
-            const table = $('#ratingTable').DataTable({
-                destroy: true, // IMPORTANT: Prevents 'Cannot reinitialise' error
-                data: tData,
-                pageLength: 25,
-                lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
-                responsive: true,
-                order: [[ 2, "desc" ]], 
-                columnDefs: [
-                    { targets: 0, className: 'rank-cell text-center' },
-                    { targets: 2, render: (data) => `<span class="elo-badge">${data}</span>` }
-                ]
-            });
-
-            table.on('order.dt search.dt', function () {
-                table.column(0, {search:'applied', order:'applied'}).nodes().each(function (cell, i) {
-                    cell.innerHTML = i + 1;
+                // 1. Table
+                const tData = GLOBAL_DATA.leaderboard.map(p => ["", p.name, p.elo, p.win_pct + "%", p.games, p.games_6m, p.games_1y, p.last_match]);
+                
+                const table = $('#ratingTable').DataTable({
+                    destroy: true,
+                    data: tData,
+                    pageLength: 25,
+                    lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+                    responsive: true,
+                    order: [[ 2, "desc" ]], 
+                    columnDefs: [
+                        { targets: 0, className: 'rank-cell' },
+                        { targets: 2, render: (d) => `<span class="elo-badge">${d}</span>` }
+                    ]
                 });
-            }).draw();
 
-            // 2. Setup Dropdowns
-            const names = GLOBAL_DATA.leaderboard.map(p => p.name).sort();
-            names.forEach(n => {
-                $('#player-select').append(new Option(n, n));
-                $('#calc-p1').append(new Option(n, n));
-                $('#calc-p2').append(new Option(n, n));
-            });
+                table.on('order.dt search.dt', function () {
+                    table.column(0, {search:'applied', order:'applied'}).nodes().each((cell, i) => cell.innerHTML = i + 1);
+                }).draw();
 
-            $('.select2-single').select2({ width: '100%' });
-            $('#player-select').select2({ placeholder: "Select players...", width: '100%' });
-            
-            const top5 = GLOBAL_DATA.leaderboard.slice(0, 5).map(p => p.name);
-            $('#player-select').val(top5).trigger('change');
-            updateChart();
-            $('#player-select').on('change', updateChart);
+                // 2. Selects
+                const names = GLOBAL_DATA.leaderboard.map(p => p.name).sort();
+                names.forEach(n => {
+                    $('#player-select').append(new Option(n, n));
+                    $('#calc-p1').append(new Option(n, n));
+                    $('#calc-p2').append(new Option(n, n));
+                });
+
+                $('.select2-single').select2({ width: '100%' });
+                $('#player-select').select2({ placeholder: "Select players...", width: '100%' });
+                
+                // Graph Default
+                const top5 = GLOBAL_DATA.leaderboard.slice(0, 5).map(p => p.name);
+                $('#player-select').val(top5).trigger('change');
+                updateChart();
+                $('#player-select').on('change', updateChart);
+
+            } catch (e) {
+                console.error(e);
+                document.getElementById('main-interface').style.display = 'none';
+                document.getElementById('data-error').style.display = 'block';
+            }
         }
 
         function updateChart() {
@@ -296,60 +230,42 @@
         function calculateWin() {
             const p1 = GLOBAL_DATA.leaderboard.find(p => p.name === $('#calc-p1').val());
             const p2 = GLOBAL_DATA.leaderboard.find(p => p.name === $('#calc-p2').val());
-            const bestOf = parseInt($('#sets-input').val());
-            const target = Math.ceil(bestOf / 2);
-
             if(!p1 || !p2) return;
 
-            $('#elo-p1').text(p1.elo);
-            $('#elo-p2').text(p2.elo);
-
-            const diff = p2.elo - p1.elo;
-            const p = 1 / (1 + Math.pow(10, diff / 400));
+            $('#elo-p1').text(p1.elo); $('#elo-p2').text(p2.elo);
+            const target = Math.ceil(parseInt($('#sets-input').val()) / 2);
+            const p = 1 / (1 + Math.pow(10, (p2.elo - p1.elo) / 400));
             
-            let probP1Match = 0;
-            let scores = [];
-
-            for (let k = 0; k < target; k++) {
-                const ways = combinations(target + k - 1, k);
-                const probScore = ways * Math.pow(p, target) * Math.pow(1-p, k);
-                probP1Match += probScore;
-                scores.push({ s: `${target}-${k}`, p: probScore, w: p1.name });
+            let prob1 = 0, scores = [];
+            for (let k=0; k<target; k++) {
+                let w = combinations(target+k-1, k) * Math.pow(p, target) * Math.pow(1-p, k);
+                prob1 += w; scores.push({s:`${target}-${k}`, p:w, w:p1.name});
             }
-            for (let k = 0; k < target; k++) {
-                const ways = combinations(target + k - 1, k);
-                const probScore = ways * Math.pow(1-p, target) * Math.pow(p, k);
-                scores.push({ s: `${k}-${target}`, p: probScore, w: p2.name });
+            for (let k=0; k<target; k++) {
+                let w = combinations(target+k-1, k) * Math.pow(1-p, target) * Math.pow(p, k);
+                scores.push({s:`${k}-${target}`, p:w, w:p2.name});
             }
+            scores.sort((a,b)=>b.p-a.p);
 
-            scores.sort((a,b) => b.p - a.p);
-
-            const pct1 = (probP1Match * 100).toFixed(1);
-            const pct2 = (100 - parseFloat(pct1)).toFixed(1);
-
+            const pct1 = (prob1 * 100).toFixed(1);
             $('#bar-p1').css('width', pct1+'%').text(p1.name);
-            $('#bar-p2').css('width', pct2+'%').text(p2.name);
-            $('#prob-p1').text(pct1 + '%');
-            $('#prob-p2').text(pct2 + '%');
+            $('#bar-p2').css('width', (100-pct1)+'%').text(p2.name);
+            $('#prob-p1').text(pct1+'%'); $('#prob-p2').text((100-pct1).toFixed(1)+'%');
 
-            const list = $('#score-probs').empty();
+            $('#score-probs').empty();
             scores.slice(0, 5).forEach(sc => {
-                const color = sc.w === p1.name ? 'text-primary' : 'text-warning';
-                list.append(`<li class="list-group-item d-flex justify-content-between align-items-center">
-                    <span class="${color} fw-bold">${sc.s} (${sc.w})</span>
+                let clr = sc.w === p1.name ? 'text-primary' : 'text-warning';
+                $('#score-probs').append(`<li class="list-group-item d-flex justify-content-between">
+                    <span class="${clr} fw-bold">${sc.s} (${sc.w})</span>
                     <span class="badge bg-secondary rounded-pill">${(sc.p*100).toFixed(1)}%</span>
                 </li>`);
             });
-
             $('#result-area').fadeIn();
         }
 
         function combinations(n, r) {
-            if (r === 0 || r === n) return 1;
-            if (r > n) return 0;
-            let res = 1;
-            for (let i = 1; i <= r; i++) res = res * (n - i + 1) / i;
-            return res;
+            if (r===0 || r===n) return 1; if (r>n) return 0;
+            let res = 1; for (let i=1; i<=r; i++) res = res * (n-i+1)/i; return res;
         }
     </script>
 </body>
