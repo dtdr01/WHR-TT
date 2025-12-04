@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Club Ratings</title>
     
-    <!-- CSS Libraries -->
+    <!-- External Libraries -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/responsive/2.4.1/css/responsive.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     
     <style>
-        body { background-color: #f0f2f5; font-family: -apple-system, sans-serif; padding-bottom: 60px; }
+        body { background-color: #f0f2f5; font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding-bottom: 60px; }
         #app-content { display: none; } 
         .navbar { background: linear-gradient(135deg, #0056b3, #004494); }
         .navbar-brand { font-weight: bold; color: white !important; }
@@ -20,7 +20,7 @@
         .elo-badge { background-color: #e3f2fd; color: #0d47a1; font-weight: 800; padding: 4px 8px; border-radius: 6px; }
         .rank-cell { font-weight: bold; color: #666; text-align: center; }
         .vs-badge { width: 40px; height: 40px; background: #eee; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin: 0 auto; }
-        #data-error { display: none; background: #ffebee; color: #c62828; padding: 15px; border-radius: 8px; margin: 20px; text-align: center; border: 1px solid #ef9a9a; }
+        #debug-area { display: none; color: red; text-align: center; margin-top: 20px; font-family: monospace; }
     </style>
 </head>
 <body>
@@ -30,8 +30,9 @@
         <div class="card p-4 text-center" style="max-width: 350px; width: 100%;">
             <h3 class="mb-3">🏓 Club Login</h3>
             <input type="password" id="password-input" class="form-control mb-3" placeholder="Password" style="text-align: center;" onkeydown="if(event.key==='Enter') checkPass()">
-            <button onclick="checkPass()" class="btn btn-primary w-100 fw-bold">ENTER</button>
+            <button onclick="checkPass()" id="login-btn" class="btn btn-primary w-100 fw-bold">ENTER</button>
             <p id="pass-error" class="text-danger mt-2 small" style="display:none;">Incorrect password</p>
+            <div id="debug-area"></div>
         </div>
     </div>
 
@@ -43,12 +44,6 @@
                 <span class="text-white-50 small" id="last-update">Loading...</span>
             </div>
         </nav>
-
-        <!-- ERROR MESSAGE AREA -->
-        <div id="data-error">
-            <strong>Error:</strong> Could not find <code>ratings_data.json</code>.<br>
-            Please upload the data file to GitHub.
-        </div>
 
         <div class="container" id="main-interface">
             <ul class="nav nav-tabs mb-3" id="myTab" role="tablist">
@@ -133,13 +128,21 @@
 
     <script>
         const CLUB_PASSWORD = "pingpong"; 
+        // We use the absolute path to ensure we hit the file you verified works
+        const DATA_URL = "https://dtdr01.github.io/WHR-TT/ratings_data.json"; 
+        
         let GLOBAL_DATA = null;
         let CHART_INSTANCE = null;
 
         function checkPass() {
             if(document.getElementById('password-input').value === CLUB_PASSWORD) {
-                document.getElementById('login-screen').style.display='none';
-                document.getElementById('app-content').style.display='block';
+                // UI Feedback
+                const btn = document.getElementById('login-btn');
+                btn.innerText = "Loading Data...";
+                btn.disabled = true;
+                document.getElementById('pass-error').style.display='none';
+                
+                // Start Fetch
                 initApp();
             } else {
                 document.getElementById('pass-error').style.display='block';
@@ -148,11 +151,18 @@
 
         async function initApp() {
             try {
-                // Force fresh load with timestamp
-                const res = await fetch('./ratings_data.json?t=' + new Date().getTime());
-                if (!res.ok) throw new Error("File not found");
+                // Add timestamp to prevent caching issues
+                const fetchUrl = DATA_URL + '?t=' + new Date().getTime();
+                console.log("Fetching: " + fetchUrl);
+                
+                const res = await fetch(fetchUrl);
+                if (!res.ok) throw new Error("HTTP " + res.status);
                 
                 GLOBAL_DATA = await res.json();
+                
+                // Switch Screens
+                document.getElementById('login-screen').style.display='none';
+                document.getElementById('app-content').style.display='block';
                 document.getElementById('last-update').innerText = "Updated: " + GLOBAL_DATA.meta.updated;
 
                 // 1. Table
@@ -175,7 +185,7 @@
                     table.column(0, {search:'applied', order:'applied'}).nodes().each((cell, i) => cell.innerHTML = i + 1);
                 }).draw();
 
-                // 2. Selects
+                // 2. Dropdowns
                 const names = GLOBAL_DATA.leaderboard.map(p => p.name).sort();
                 names.forEach(n => {
                     $('#player-select').append(new Option(n, n));
@@ -194,8 +204,13 @@
 
             } catch (e) {
                 console.error(e);
-                document.getElementById('main-interface').style.display = 'none';
-                document.getElementById('data-error').style.display = 'block';
+                const debug = document.getElementById('debug-area');
+                debug.style.display = 'block';
+                debug.innerHTML = "FAILED TO LOAD DATA<br>" + e.message + "<br><br>Check browser console.";
+                
+                const btn = document.getElementById('login-btn');
+                btn.innerText = "Try Again";
+                btn.disabled = false;
             }
         }
 
