@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Club Ratings</title>
+    
+    <!-- Libraries (Bootstrap, DataTables, Chart.js, Select2) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    
+    <style>
+        /* Privacy Shield */
+        #app-content { display: none; }
+        
+        body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .navbar { background-color: #0056b3; }
+        .navbar-brand, .nav-link { color: white !important; }
+        .card { border: none; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .card-header { background-color: #fff; border-bottom: 2px solid #0056b3; font-weight: bold; color: #0056b3; }
+        
+        /* Table Styling */
+        table.dataTable thead { background-color: #0056b3; color: white; }
+        .elo-badge { background-color: #e9ecef; color: #0056b3; font-weight: bold; padding: 2px 6px; border-radius: 4px; }
+        
+        /* Forecast Section */
+        .vs-circle { width: 40px; height: 40px; background: #dc3545; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin: 0 auto; }
+        .win-prob { font-size: 1.5rem; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <!-- PASSWORD PROMPT -->
+    <div id="login-screen" class="container mt-5 text-center">
+        <h3>Private Club Area</h3>
+        <div class="col-md-4 offset-md-4 mt-3">
+            <input type="password" id="password-input" class="form-control" placeholder="Enter Club Password">
+            <button onclick="checkPass()" class="btn btn-primary mt-2 w-100">Enter</button>
+            <p id="error-msg" class="text-danger mt-2" style="display:none;">Wrong password</p>
+        </div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="app-content">
+        
+        <!-- Navbar -->
+        <nav class="navbar navbar-expand-lg mb-4">
+            <div class="container">
+                <a class="navbar-brand" href="#">🏓 Club Ratings</a>
+                <div class="ms-auto text-white" id="last-update">Updating...</div>
+            </div>
+        </nav>
+
+        <div class="container">
+            
+            <!-- TABS -->
+            <ul class="nav nav-tabs mb-3" id="myTab" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link active" id="rank-tab" data-bs-toggle="tab" data-bs-target="#rankings" type="button">🏆 Rankings</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="hist-tab" data-bs-toggle="tab" data-bs-target="#history" type="button">📈 History Graph</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="calc-tab" data-bs-toggle="tab" data-bs-target="#forecast" type="button">🔮 Forecast</button>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                
+                <!-- 1. RANKINGS TABLE -->
+                <div class="tab-pane fade show active" id="rankings">
+                    <div class="card p-3">
+                        <table id="ratingTable" class="table table-striped" style="width:100%">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Player</th>
+                                    <th>Rating</th>
+                                    <th>Games</th>
+                                    <th>Win %</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 2. HISTORY GRAPH -->
+                <div class="tab-pane fade" id="history">
+                    <div class="card p-3">
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label>Select Players to Compare:</label>
+                                <select id="player-select" class="form-control" multiple="multiple" style="width: 100%"></select>
+                            </div>
+                        </div>
+                        <div style="height: 500px;">
+                            <canvas id="historyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. FORECAST CALCULATOR -->
+                <div class="tab-pane fade" id="forecast">
+                    <div class="card p-4">
+                        <div class="row align-items-center">
+                            <div class="col-md-5 text-center">
+                                <h5>Player A</h5>
+                                <select id="calc-p1" class="form-control select2-single"></select>
+                                <h3 class="mt-2 text-primary" id="elo-p1">-</h3>
+                            </div>
+                            <div class="col-md-2 text-center">
+                                <div class="vs-circle">VS</div>
+                            </div>
+                            <div class="col-md-5 text-center">
+                                <h5>Player B</h5>
+                                <select id="calc-p2" class="form-control select2-single"></select>
+                                <h3 class="mt-2 text-primary" id="elo-p2">-</h3>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="text-center mt-3">
+                            <button onclick="calculateWin()" class="btn btn-success btn-lg">Calculate Probability</button>
+                            <div id="result-area" class="mt-4" style="display:none;">
+                                <h5>Win Probability</h5>
+                                <div class="progress" style="height: 30px;">
+                                    <div id="bar-p1" class="progress-bar bg-primary" role="progressbar" style="width: 50%"></div>
+                                    <div id="bar-p2" class="progress-bar bg-danger" role="progressbar" style="width: 50%"></div>
+                                </div>
+                                <div class="d-flex justify-content-between mt-2">
+                                    <span class="win-prob" id="prob-p1">50%</span>
+                                    <span class="win-prob" id="prob-p2">50%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://code.jquery.com/jquery-3.7.0.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+    <script>
+        // --- CONFIGURATION ---
+        const CLUB_PASSWORD = "pingpong"; // CHANGE THIS!
+        let GLOBAL_DATA = null;
+        let CHART_INSTANCE = null;
+
+        // 1. Password Check
+        function checkPass() {
+            const input = document.getElementById('password-input').value;
+            if(input === CLUB_PASSWORD) {
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('app-content').style.display = 'block';
+                initApp();
+            } else {
+                document.getElementById('error-msg').style.display = 'block';
+            }
+        }
+
+        // 2. Initialize App
+        async function initApp() {
+            try {
+                // Load JSON Data
+                const response = await fetch('ratings_data.json');
+                GLOBAL_DATA = await response.json();
+                
+                document.getElementById('last-update').innerText = "Updated: " + GLOBAL_DATA.meta.updated;
+
+                // A. Render Table
+                const tableData = GLOBAL_DATA.leaderboard.map((p, index) => [
+                    index + 1,
+                    p.name,
+                    `<span class="elo-badge">${p.elo}</span>`,
+                    p.games,
+                    p.win_pct + "%"
+                ]);
+
+                $('#ratingTable').DataTable({
+                    data: tableData,
+                    pageLength: 25
+                });
+
+                // B. Init Select2 for Graph & Calculator
+                const playerNames = GLOBAL_DATA.leaderboard.map(p => p.name).sort();
+                
+                // Populate Dropdowns
+                playerNames.forEach(name => {
+                    $('#player-select').append(new Option(name, name));
+                    $('#calc-p1').append(new Option(name, name));
+                    $('#calc-p2').append(new Option(name, name));
+                });
+
+                // Select2 Logic
+                $('#player-select').select2({ placeholder: "Select players to graph...", width: '100%' });
+                $('.select2-single').select2({ width: '100%' });
+
+                // Pre-select Top 5 for Graph
+                const top5 = GLOBAL_DATA.leaderboard.slice(0, 5).map(p => p.name);
+                $('#player-select').val(top5).trigger('change');
+                updateChart();
+
+                // Graph Event Listener
+                $('#player-select').on('change', updateChart);
+
+            } catch (err) {
+                alert("Error loading data. Make sure 'ratings_data.json' exists.");
+                console.error(err);
+            }
+        }
+
+        // 3. Update Chart
+        function updateChart() {
+            const selectedNames = $('#player-select').val();
+            const datasets = [];
+            
+            // Vibrant colors for lines
+            const colors = ['#dc3545', '#0d6efd', '#198754', '#fd7e14', '#6f42c1', '#0dcaf0', '#20c997'];
+
+            selectedNames.forEach((name, idx) => {
+                if(GLOBAL_DATA.history[name]) {
+                    datasets.push({
+                        label: name,
+                        data: GLOBAL_DATA.history[name],
+                        borderColor: colors[idx % colors.length],
+                        backgroundColor: colors[idx % colors.length],
+                        borderWidth: 2,
+                        tension: 0.3,
+                        pointRadius: 0 // Hide points for clean look
+                    });
+                }
+            });
+
+            const ctx = document.getElementById('historyChart').getContext('2d');
+            
+            if(CHART_INSTANCE) CHART_INSTANCE.destroy();
+
+            CHART_INSTANCE = new Chart(ctx, {
+                type: 'line',
+                data: { datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { type: 'time', time: { unit: 'month' } },
+                        y: { title: { display: true, text: 'Elo Rating' } }
+                    },
+                    interaction: { mode: 'index', intersect: false }
+                }
+            });
+        }
+
+        // 4. Forecast Calculator
+        function calculateWin() {
+            const p1Name = $('#calc-p1').val();
+            const p2Name = $('#calc-p2').val();
+            
+            const p1Obj = GLOBAL_DATA.leaderboard.find(p => p.name === p1Name);
+            const p2Obj = GLOBAL_DATA.leaderboard.find(p => p.name === p2Name);
+
+            if(!p1Obj || !p2Obj) return;
+
+            // Update UI Numbers
+            document.getElementById('elo-p1').innerText = p1Obj.elo;
+            document.getElementById('elo-p2').innerText = p2Obj.elo;
+
+            // Math
+            const diff = p2Obj.elo - p1Obj.elo;
+            const probP1 = 1 / (1 + Math.pow(10, diff / 400));
+            const pctP1 = (probP1 * 100).toFixed(1);
+            const pctP2 = (100 - pctP1).toFixed(1);
+
+            // Update Bars
+            document.getElementById('bar-p1').style.width = pctP1 + "%";
+            document.getElementById('bar-p1').innerText = p1Name;
+            document.getElementById('prob-p1').innerText = pctP1 + "%";
+
+            document.getElementById('bar-p2').style.width = pctP2 + "%";
+            document.getElementById('bar-p2').innerText = p2Name;
+            document.getElementById('prob-p2').innerText = pctP2 + "%";
+
+            document.getElementById('result-area').style.display = 'block';
+        }
+
+    </script>
+</body>
+</html>
