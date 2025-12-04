@@ -13,7 +13,21 @@
     
     <style>
         body { background-color: #f0f2f5; font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding-bottom: 60px; }
-        #app-content { display: none; } 
+        
+        /* FIX 1: Login Screen is now a FIXED overlay on top of everything */
+        #login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #e9ecef;
+            z-index: 9999; /* Always on top */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
         .navbar { background: linear-gradient(135deg, #0056b3, #004494); }
         .navbar-brand { font-weight: bold; color: white !important; }
         .card { border-radius: 12px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
@@ -26,8 +40,8 @@
 <body>
 
     <!-- LOGIN SCREEN -->
-    <div id="login-screen" class="d-flex align-items-center justify-content-center" style="height: 100vh; background: #e9ecef;">
-        <div class="card p-4 text-center" style="max-width: 350px; width: 100%;">
+    <div id="login-screen">
+        <div class="card p-4 text-center" style="max-width: 350px; width: 90%;">
             <h3 class="mb-3">🏓 Club Login</h3>
             <input type="password" id="password-input" class="form-control mb-3" placeholder="Password" style="text-align: center;" onkeydown="if(event.key==='Enter') checkPass()">
             <button onclick="checkPass()" id="login-btn" class="btn btn-primary w-100 fw-bold">ENTER</button>
@@ -36,8 +50,8 @@
         </div>
     </div>
 
-    <!-- MAIN APP -->
-    <div id="app-content">
+    <!-- MAIN APP (FIX 2: Inline style ensures it is hidden on load) -->
+    <div id="app-content" style="display: none;">
         <nav class="navbar navbar-dark mb-3">
             <div class="container d-flex justify-content-between">
                 <span class="navbar-brand">🏓 Club Ratings</span>
@@ -128,7 +142,6 @@
 
     <script>
         const CLUB_PASSWORD = "pingpong"; 
-        // We use the absolute path to ensure we hit the file you verified works
         const DATA_URL = "https://dtdr01.github.io/WHR-TT/ratings_data.json"; 
         
         let GLOBAL_DATA = null;
@@ -136,13 +149,10 @@
 
         function checkPass() {
             if(document.getElementById('password-input').value === CLUB_PASSWORD) {
-                // UI Feedback
                 const btn = document.getElementById('login-btn');
                 btn.innerText = "Loading Data...";
                 btn.disabled = true;
                 document.getElementById('pass-error').style.display='none';
-                
-                // Start Fetch
                 initApp();
             } else {
                 document.getElementById('pass-error').style.display='block';
@@ -151,16 +161,14 @@
 
         async function initApp() {
             try {
-                // Add timestamp to prevent caching issues
+                // Fetch Data
                 const fetchUrl = DATA_URL + '?t=' + new Date().getTime();
-                console.log("Fetching: " + fetchUrl);
-                
                 const res = await fetch(fetchUrl);
                 if (!res.ok) throw new Error("HTTP " + res.status);
                 
                 GLOBAL_DATA = await res.json();
                 
-                // Switch Screens
+                // Hide Login (Fixed Overlay), Show App
                 document.getElementById('login-screen').style.display='none';
                 document.getElementById('app-content').style.display='block';
                 document.getElementById('last-update').innerText = "Updated: " + GLOBAL_DATA.meta.updated;
@@ -185,7 +193,7 @@
                     table.column(0, {search:'applied', order:'applied'}).nodes().each((cell, i) => cell.innerHTML = i + 1);
                 }).draw();
 
-                // 2. Dropdowns
+                // 2. Selects
                 const names = GLOBAL_DATA.leaderboard.map(p => p.name).sort();
                 names.forEach(n => {
                     $('#player-select').append(new Option(n, n));
@@ -206,8 +214,7 @@
                 console.error(e);
                 const debug = document.getElementById('debug-area');
                 debug.style.display = 'block';
-                debug.innerHTML = "FAILED TO LOAD DATA<br>" + e.message + "<br><br>Check browser console.";
-                
+                debug.innerHTML = "FAILED TO LOAD DATA<br>" + e.message;
                 const btn = document.getElementById('login-btn');
                 btn.innerText = "Try Again";
                 btn.disabled = false;
