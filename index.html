@@ -149,7 +149,7 @@
         async function initApp() {
             try {
                 // Force fresh load with timestamp
-                const res = await fetch('ratings_data.json?t=' + new Date().getTime());
+                const res = await fetch('./ratings_data.json?t=' + new Date().getTime());
                 if (!res.ok) throw new Error("File not found");
                 
                 GLOBAL_DATA = await res.json();
