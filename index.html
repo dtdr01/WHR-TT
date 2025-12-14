@@ -22,9 +22,10 @@
         .card { border-radius: 12px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
         
         .elo-badge { background-color: #e3f2fd; color: #0d47a1; font-weight: 800; padding: 4px 8px; border-radius: 6px; }
-        .hist-elo-badge { background-color: #f8f9fa; color: #555; font-weight: bold; padding: 2px 6px; border-radius: 4px; border: 1px solid #ddd; font-size: 0.9em; }
+        .hist-elo-badge { background-color: #f8f9fa; color: #555; font-weight: bold; padding: 2px 6px; border-radius: 4px; border: 1px solid #ddd; font-size: 0.85em; }
         .rank-cell { font-weight: bold; color: #666; text-align: center; }
         
+        /* Links & Buttons */
         .player-link { color: #0d6efd; font-weight: 600; text-decoration: none; cursor: pointer; margin-right: 8px; }
         .player-link:hover { text-decoration: underline; }
         
@@ -176,7 +177,7 @@
         </div>
     </div>
 
-    <!-- TIMELINE MODAL (UPDATED WITH ELO) -->
+    <!-- TIMELINE MODAL (UPDATED) -->
     <div class="modal fade" id="timelineModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
@@ -185,12 +186,13 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-0">
-                    <table class="table table-hover mb-0 align-middle">
+                    <table class="table table-hover mb-0 align-middle small">
                         <thead class="table-light sticky-top">
                             <tr>
                                 <th>Date</th>
-                                <th class="text-center">My Elo</th> <!-- NEW -->
+                                <th class="text-center">My Elo</th>
                                 <th>Opponent</th>
+                                <th class="text-center">Opp Elo</th> <!-- NEW COL -->
                                 <th class="text-center">Result</th>
                                 <th class="text-center">Score</th>
                             </tr>
@@ -324,16 +326,14 @@
             } catch (e) { console.error(e); alert("Load Failed"); }
         }
 
-        // --- TIMELINE LOGIC (UPDATED WITH RATING LOOKUP) ---
+        // --- TIMELINE LOGIC (UPDATED WITH OPPONENT ELO) ---
         function openTimeline(player) {
             document.getElementById('timelineTitle').innerText = "History: " + player;
             const tbody = document.getElementById('timelineBody');
             tbody.innerHTML = "";
 
             const myMatches = [];
-            
-            // Helper to find rating on date
-            const playerHistory = GLOBAL_DATA.history[player]; // Array of {x: date, y: rating}
+            const playerHistory = GLOBAL_DATA.history[player];
 
             GLOBAL_DATA.matches.forEach(m => {
                 let opponent = null;
@@ -353,12 +353,18 @@
                     if (myScore > oppScore) result = "Win";
                     if (myScore < oppScore) result = "Loss";
 
-                    // Lookup Rating
+                    // Lookup My Elo
                     let myElo = "-";
                     if (playerHistory) {
-                        // Find entry matching this date
                         const entry = playerHistory.find(h => h.x === m.d);
                         if (entry) myElo = entry.y;
+                    }
+
+                    // Lookup Opponent Elo (New)
+                    let oppElo = "-";
+                    if (GLOBAL_DATA.history[opponent]) {
+                        const entry = GLOBAL_DATA.history[opponent].find(h => h.x === m.d);
+                        if (entry) oppElo = entry.y;
                     }
 
                     myMatches.push({
@@ -366,7 +372,8 @@
                         opp: opponent,
                         res: result,
                         score: `${myScore} - ${oppScore}`,
-                        elo: myElo
+                        elo: myElo,
+                        oppElo: oppElo // store for row
                     });
                 }
             });
@@ -374,7 +381,7 @@
             myMatches.sort((a,b) => new Date(b.dateStr) - new Date(a.dateStr));
 
             if (myMatches.length === 0) {
-                tbody.innerHTML = "<tr><td colspan='5' class='text-center'>No matches found.</td></tr>";
+                tbody.innerHTML = "<tr><td colspan='6' class='text-center'>No matches found.</td></tr>";
             } else {
                 myMatches.forEach(m => {
                     let rowClass = "";
@@ -387,6 +394,7 @@
                         <td>${m.dateStr}</td>
                         <td class="text-center"><span class="hist-elo-badge">${m.elo}</span></td>
                         <td class="fw-bold">${m.opp}</td>
+                        <td class="text-center"><span class="hist-elo-badge">${m.oppElo}</span></td>
                         <td class="text-center"><span class="badge ${badgeClass}">${m.res}</span></td>
                         <td class="text-center fw-bold">${m.score}</td>
                     </tr>`;
