@@ -45,6 +45,15 @@
         /* Loader */
         .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #3498db; width: 20px; height: 20px; -webkit-animation: spin 1s linear infinite; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-left: 10px; display: none; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Mobile Optimizations for Rankings */
+        @media (max-width: 576px) {
+            #ratingTable { font-size: 0.85rem; }
+            #ratingTable td, #ratingTable th { padding: 8px 4px !important; }
+            .elo-badge { padding: 2px 5px; font-size: 0.9em; }
+            .timeline-btn { font-size: 1rem; }
+            .container { padding-left: 10px; padding-right: 10px; }
+        }
     </style>
 </head>
 <body>
@@ -99,9 +108,17 @@
                                 </select>
                             </div>
                         </div>
+                        <!-- Updated Table Headers with priority -->
                         <table id="ratingTable" class="table table-hover dt-responsive nowrap" style="width:100%">
                             <thead>
-                                <tr><th>#</th><th>Player</th><th>Elo</th><th>Win %</th><th>Games</th><th>Last Match</th></tr>
+                                <tr>
+                                    <th data-priority="1">#</th>
+                                    <th data-priority="1">Player</th>
+                                    <th data-priority="1">Elo</th>
+                                    <th data-priority="2">Win %</th>
+                                    <th data-priority="3">Games</th>
+                                    <th data-priority="4">Last Match</th>
+                                </tr>
                             </thead>
                             <tbody></tbody>
                         </table>
