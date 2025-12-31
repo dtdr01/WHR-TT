@@ -10,6 +10,7 @@
     <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/responsive/2.4.1/css/responsive.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
     
     <style>
         body { background-color: #f0f2f5; font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding-bottom: 60px; }
@@ -23,23 +24,27 @@
         
         .elo-badge { background-color: #e3f2fd; color: #0d47a1; font-weight: 800; padding: 4px 8px; border-radius: 6px; }
         .hist-elo-badge { background-color: #f8f9fa; color: #555; font-weight: bold; padding: 2px 6px; border-radius: 4px; border: 1px solid #ddd; font-size: 0.85em; }
-        .rank-cell { font-weight: bold; color: #555; text-align: center; font-size: 1.1em; width: 40px; }
+        .rank-cell { font-weight: bold; color: #666; text-align: center; }
         
-        /* Player Links */
-        .player-name-wrapper { display: flex; align-items: center; justify-content: space-between; width: 100%; }
-        .player-link { color: #0d6efd; font-weight: 600; text-decoration: none; cursor: pointer; flex-grow: 1; }
+        .player-link { color: #0d6efd; font-weight: 600; text-decoration: none; cursor: pointer; margin-right: 8px; }
         .player-link:hover { text-decoration: underline; }
-        .timeline-btn { cursor: pointer; text-decoration: none; font-size: 1.2em; opacity: 0.7; transition: transform 0.2s; margin-left: 10px; }
-        .timeline-btn:hover { transform: scale(1.2); opacity: 1; }
+        
+        .timeline-btn { cursor: pointer; text-decoration: none; font-size: 1.1em; opacity: 0.7; transition: opacity 0.2s; }
+        .timeline-btn:hover { opacity: 1.0; transform: scale(1.1); display: inline-block; }
 
         .score-link { color: #212529; font-weight: bold; text-decoration: none; border-bottom: 1px dotted #999; cursor: pointer; }
         .score-link:hover { background-color: #ffffd0; }
         
+        /* Win/Loss Colors in Timeline */
         .row-win { border-left: 5px solid #198754; background-color: #f8fff9; }
         .row-loss { border-left: 5px solid #dc3545; background-color: #fff8f8; }
         
         .vs-badge { width: 40px; height: 40px; background: #eee; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin: 0 auto; }
         #debug-area { display: none; background-color: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; margin-top: 15px; font-size: 0.85rem; }
+
+        /* Loader */
+        .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #3498db; width: 20px; height: 20px; -webkit-animation: spin 1s linear infinite; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-left: 10px; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -51,7 +56,6 @@
             <input type="password" id="password-input" class="form-control mb-3" placeholder="Password" style="text-align: center;" onkeydown="if(event.key==='Enter') checkPass()">
             <button onclick="checkPass()" id="login-btn" class="btn btn-primary w-100 fw-bold">ENTER</button>
             <p id="pass-error" class="text-danger mt-2 small" style="display:none;">Incorrect password</p>
-            <div id="debug-area"></div>
         </div>
     </div>
 
@@ -68,44 +72,43 @@
             <ul class="nav nav-tabs mb-3" id="myTab" role="tablist">
                 <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#rankings">🏆 Rankings</button></li>
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#history">📈 History Graph</button></li>
-                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#forecast">🔮 Calculator</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#match-calc">🧮 H2H Calc</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tournament-calc">🔮 Tournament</button></li>
             </ul>
 
             <div class="tab-content">
                 <!-- RANKINGS -->
                 <div class="tab-pane fade show active" id="rankings">
                     <div class="card p-3">
-                        <div class="row mb-3">
-                            <div class="col-md-6 d-flex align-items-center">
-                                <label class="fw-bold me-2 text-secondary">Filter:</label>
-                                <select id="activity-filter" class="form-select form-select-sm w-auto" onchange="updateTable()">
+                        <div class="row mb-3 g-2">
+                            <div class="col-6 col-md-4">
+                                <label class="fw-bold text-secondary small">Filter Period:</label>
+                                <select id="history-filter" class="form-select form-select-sm">
+                                    <option value="current">Current</option>
+                                    <!-- Options populated by JS -->
+                                </select>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <label class="fw-bold text-secondary small">Activity:</label>
+                                <select id="activity-filter" class="form-select form-select-sm">
                                     <option value="all">Show All</option>
-                                    <option value="1m">Active (1 Month)</option>
-                                    <option value="6m">Active (6 Months)</option>
-                                    <option value="1y" selected>Active (1 Year)</option>
-                                    <option value="inactive">Inactive (> 1 Year)</option>
+                                    <option value="1m">Active (1 Mo)</option>
+                                    <option value="6m">Active (6 Mo)</option>
+                                    <option value="1y" selected>Active (1 Yr)</option>
+                                    <option value="inactive">Inactive (> 1 Yr)</option>
                                 </select>
                             </div>
                         </div>
                         <table id="ratingTable" class="table table-hover dt-responsive nowrap" style="width:100%">
                             <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Player</th>
-                                    <th>Elo</th>
-                                    <th>Win %</th>
-                                    <th>Games</th>
-                                    <th>6m</th>
-                                    <th>1y</th>
-                                    <th>Last</th>
-                                </tr>
+                                <tr><th>#</th><th>Player</th><th>Elo</th><th>Win %</th><th>Games</th><th>Last Match</th></tr>
                             </thead>
                             <tbody></tbody>
                         </table>
                     </div>
                 </div>
 
-                <!-- HISTORY TAB -->
+                <!-- HISTORY GRAPH -->
                 <div class="tab-pane fade" id="history">
                     <div class="card p-3">
                         <label class="form-label fw-bold">Select Players:</label>
@@ -114,11 +117,11 @@
                     </div>
                 </div>
 
-                <!-- CALCULATOR TAB -->
-                <div class="tab-pane fade" id="forecast">
+                <!-- H2H CALCULATOR -->
+                <div class="tab-pane fade" id="match-calc">
                     <div class="card p-3">
                         <div class="mb-3 text-center">
-                            <label class="fw-bold">Match Format:</label>
+                            <label class="fw-bold">Format:</label>
                             <select id="sets-input" class="form-select w-auto d-inline-block ms-2">
                                 <option value="1">Single Game</option>
                                 <option value="3">Best of 3</option>
@@ -137,7 +140,7 @@
                                 <div class="text-center mt-2 fw-bold text-primary" id="elo-p2">-</div>
                             </div>
                         </div>
-                        <div class="d-grid gap-2 mt-4"><button onclick="calculateWin()" class="btn btn-success fw-bold">PREDICT</button></div>
+                        <div class="d-grid gap-2 mt-4"><button onclick="calculateWin()" class="btn btn-success fw-bold">PREDICT MATCH</button></div>
                         <div id="result-area" class="mt-4" style="display:none;">
                             <div class="progress" style="height: 25px;">
                                 <div id="bar-p1" class="progress-bar bg-primary" style="width: 50%"></div>
@@ -151,6 +154,44 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- TOURNAMENT CALCULATOR -->
+                <div class="tab-pane fade" id="tournament-calc">
+                    <div class="card p-3">
+                        <h5 class="card-title fw-bold text-primary mb-3">🏆 Tournament Predictor</h5>
+                        <div class="alert alert-info small py-2">
+                            <strong>Logic:</strong> Best of 5 sets.<br>
+                            • ≤ 10 Players: Round Robin.<br>
+                            • > 10 Players: Groups (Top 2 advance) → Bracket.
+                        </div>
+                        
+                        <label class="form-label fw-bold">Select Participants:</label>
+                        <select id="tourney-players" class="form-control" multiple="multiple" style="width: 100%"></select>
+                        
+                        <div class="d-grid gap-2 mt-3">
+                            <button onclick="runTournamentSim()" id="btn-sim-tourney" class="btn btn-primary fw-bold">
+                                SIMULATE TOURNAMENT <div class="loader" id="tourney-loader"></div>
+                            </button>
+                        </div>
+
+                        <div id="tourney-results" class="mt-4" style="display:none;">
+                            <h6 class="fw-bold border-bottom pb-2">Win Probabilities (Simulated)</h6>
+                            <table class="table table-sm table-striped align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Rank</th>
+                                        <th>Player</th>
+                                        <th class="text-center">Elo</th>
+                                        <th class="text-center">Win %</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tourney-table-body"></tbody>
+                            </table>
+                            <div class="text-muted small text-center mt-2" id="sim-details"></div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
@@ -174,7 +215,6 @@
                                     <th class="text-center">W</th>
                                     <th class="text-center">L</th>
                                     <th class="text-center">Score</th>
-                                    <th class="text-center">Sets</th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
@@ -245,42 +285,18 @@
         let GLOBAL_DATA = null;
         let CHART_INSTANCE = null;
         let H2H_TABLE = null;
-        let h2hModalInstance = null;
         let MAIN_TABLE = null;
-        let CURRENT_RANKS = {};
 
+        // --- INIT & AUTH ---
         function checkPass() {
             if(document.getElementById('password-input').value === CLUB_PASSWORD) {
                 const btn = document.getElementById('login-btn');
                 btn.innerText = "Loading...";
                 btn.disabled = true;
-                document.getElementById('pass-error').style.display='none';
                 initApp();
             } else {
                 document.getElementById('pass-error').style.display='block';
             }
-        }
-
-        function checkActivity(dateStr, filterVal) {
-            if (filterVal === 'all') return true;
-            if (!dateStr || dateStr === '-' || dateStr === 'N/A') return filterVal === 'inactive';
-            const parts = dateStr.split('/');
-            const lastMatch = new Date(parts[2], parts[1] - 1, parts[0]);
-            const diffDays = Math.ceil(Math.abs(new Date() - lastMatch) / (1000 * 60 * 60 * 24)); 
-            if (filterVal === '1m') return diffDays <= 35;
-            if (filterVal === '6m') return diffDays <= 185;
-            if (filterVal === '1y') return diffDays <= 366;
-            if (filterVal === 'inactive') return diffDays > 366;
-            return true;
-        }
-
-        // --- CORE RANK UPDATE ---
-        function updateRanks() {
-            const filterVal = $('#activity-filter').val();
-            const activePlayers = GLOBAL_DATA.leaderboard.filter(p => checkActivity(p.last_match, filterVal));
-            activePlayers.sort((a, b) => b.elo - a.elo);
-            CURRENT_RANKS = {};
-            activePlayers.forEach((p, index) => { CURRENT_RANKS[p.name] = index + 1; });
         }
 
         async function initApp() {
@@ -293,80 +309,463 @@
                 document.getElementById('app-content').style.display='block';
                 document.getElementById('last-update').innerText = "Updated: " + GLOBAL_DATA.meta.updated;
 
-                // 1. Init Table (Empty)
-                MAIN_TABLE = $('#ratingTable').DataTable({
-                    data: [], // Starts empty, filled by updateTable()
-                    pageLength: 25,
-                    lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
-                    responsive: true,
-                    order: [[ 2, "desc" ]], // Elo desc
-                    columns: [
-                        { title: "#", data: "rank", className: 'rank-cell all' },
-                        { title: "Player", data: "player_html", className: "all" },
-                        { title: "Elo", data: "elo_html", className: "all" },
-                        { title: "Win %", data: "win_pct", className: "min-tablet" },
-                        { title: "Games", data: "games", className: "min-tablet" },
-                        { title: "6m", data: "games_6m", className: "desktop" },
-                        { title: "1y", data: "games_1y", className: "desktop" },
-                        { title: "Last", data: "last_match", className: "desktop" }
-                    ]
-                });
-
-                // 2. Load Data
-                updateTable();
-
-                // 3. Dropdowns
-                const names = GLOBAL_DATA.leaderboard.map(p => p.name).sort();
-                names.forEach(n => {
-                    $('#player-select').append(new Option(n, n));
-                    $('#calc-p1').append(new Option(n, n));
-                    $('#calc-p2').append(new Option(n, n));
-                });
-                $('.select2-single').select2({ width: '100%' });
-                $('#player-select').select2({ placeholder: "Select players...", width: '100%' });
-                const top5 = GLOBAL_DATA.leaderboard.slice(0, 5).map(p => p.name);
-                $('#player-select').val(top5).trigger('change');
-                updateChart();
-                $('#player-select').on('change', updateChart);
+                setupTablesAndFilters();
+                populateHistoryDropdown();
+                setupCalculators();
 
             } catch (e) { console.error(e); alert("Load Failed"); }
         }
 
-        // --- UPDATE TABLE FUNCTION ---
-        function updateTable() {
-            updateRanks(); // Recalc ranks first
-            const filterVal = $('#activity-filter').val();
+        // --- RANKINGS & FILTERS ---
+        function setupTablesAndFilters() {
+            // Activity Filter logic
+            $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+                if (settings.nTable.id !== 'ratingTable') return true;
+                const filterVal = $('#activity-filter').val();
+                if (filterVal === 'all') return true;
+                
+                const dateStr = data[5]; // Index 5 is Last Match
+                if (!dateStr || dateStr === '-' || dateStr === 'N/A') return filterVal === 'inactive';
+                
+                // Parse DD/MM/YYYY
+                const parts = dateStr.split('/');
+                const lastMatch = new Date(parts[2], parts[1] - 1, parts[0]);
+                const diffDays = Math.ceil(Math.abs(new Date() - lastMatch) / (1000 * 60 * 60 * 24)); 
+                
+                if (filterVal === '1m') return diffDays <= 35;
+                if (filterVal === '6m') return diffDays <= 185;
+                if (filterVal === '1y') return diffDays <= 366;
+                if (filterVal === 'inactive') return diffDays > 366;
+                return true;
+            });
 
-            // Filter & Map
-            const displayRows = GLOBAL_DATA.leaderboard
-                .filter(p => checkActivity(p.last_match, filterVal))
-                .map(p => {
-                    const safeName = p.name.replace(/'/g, "\\'"); // Escape quotes
-                    return {
-                        rank: CURRENT_RANKS[p.name] || '-',
-                        player_html: `<div class="player-name-wrapper">
-                            <a class="player-link" onclick="openH2H('${safeName}')">${p.name}</a>
-                            <span class="timeline-btn" onclick="openTimeline('${safeName}')" title="Match History">📜</span>
-                         </div>`,
-                        elo_html: `<span class="elo-badge">${p.elo}</span>`,
-                        elo: p.elo, // For sorting
-                        win_pct: p.win_pct + "%",
-                        games: p.games,
-                        games_6m: p.games_6m,
-                        games_1y: p.games_1y,
-                        last_match: p.last_match
-                    };
-                });
+            // Initial Draw (Current Data)
+            renderMainTable(generateTableData(null, null));
 
-            // Feed Data
-            MAIN_TABLE.clear().rows.add(displayRows).draw();
+            $('#activity-filter').on('change', function() { MAIN_TABLE.draw(); });
+            $('#history-filter').on('change', function() {
+                const val = $(this).val();
+                if (val === 'current') {
+                    renderMainTable(generateTableData(null, null));
+                    $('#activity-filter').prop('disabled', false); // Enable activity filter for current
+                } else {
+                    const range = JSON.parse(val);
+                    const start = new Date(range.s);
+                    const end = new Date(range.e);
+                    $('#activity-filter').val('all').prop('disabled', true); // Disable activity filter for history
+                    renderMainTable(generateTableData(start, end));
+                }
+            });
         }
 
-        // --- TIMELINE ---
+        function populateHistoryDropdown() {
+            const matches = GLOBAL_DATA.matches;
+            if(!matches || matches.length === 0) return;
+            
+            // Find min date
+            const dates = matches.map(m => new Date(m.d));
+            const minDate = new Date(Math.min.apply(null, dates));
+            const today = new Date();
+            
+            const sel = document.getElementById('history-filter');
+            
+            // Generate Quarters backwards
+            let curr = new Date(today.getFullYear(), today.getMonth(), 1);
+            
+            while(curr >= minDate) {
+                const year = curr.getFullYear();
+                const month = curr.getMonth(); // 0-11
+                const q = Math.floor(month / 3) + 1;
+                
+                const qStartMonth = (q-1)*3;
+                const qStart = new Date(year, qStartMonth, 1);
+                const qEnd = new Date(year, qStartMonth + 3, 0); 
+                
+                if (qEnd >= minDate) {
+                    const label = `${year} Q${q}`;
+                    const val = JSON.stringify({ s: qStart.toISOString(), e: qEnd.toISOString() });
+                    
+                    let exists = false;
+                    for(let i=0; i<sel.options.length; i++) { if(sel.options[i].text === label) exists=true; }
+                    
+                    if(!exists) {
+                        const opt = document.createElement("option");
+                        opt.value = val;
+                        opt.text = label;
+                        sel.appendChild(opt);
+                    }
+                }
+                
+                if (month === 11) {
+                    const yStart = new Date(year, 0, 1);
+                    const yEnd = new Date(year, 11, 31);
+                    const yLabel = `${year} Full Year`;
+                    const yVal = JSON.stringify({ s: yStart.toISOString(), e: yEnd.toISOString() });
+                     const opt = document.createElement("option");
+                    opt.value = yVal;
+                    opt.text = yLabel;
+                    sel.appendChild(opt);
+                }
+                // Move back 3 months
+                curr.setMonth(curr.getMonth() - 3);
+            }
+        }
+
+        function generateTableData(startDate, endDate) {
+            if (!startDate) {
+                return GLOBAL_DATA.leaderboard.map((p, index) => ({
+                    rank: index + 1,
+                    name: p.name,
+                    elo: p.elo,
+                    win_pct: p.win_pct,
+                    games: p.games,
+                    last: p.last_match
+                }));
+            }
+
+            // FILTER MODE
+            const playerStats = {};
+            GLOBAL_DATA.leaderboard.forEach(p => {
+                playerStats[p.name] = { w:0, l:0, games:0, last_ts: 0 };
+            });
+
+            GLOBAL_DATA.matches.forEach(m => {
+                const d = new Date(m.d);
+                if (d >= startDate && d <= endDate) {
+                    const score = m.sc.split('-');
+                    const s1 = parseInt(score[0]);
+                    const s2 = parseInt(score[1]);
+                    
+                    if (playerStats[m.p1]) {
+                        playerStats[m.p1].games++;
+                        if (s1 > s2) playerStats[m.p1].w++; else playerStats[m.p1].l++;
+                        if (d.getTime() > playerStats[m.p1].last_ts) playerStats[m.p1].last_ts = d.getTime();
+                    }
+                    if (playerStats[m.p2]) {
+                        playerStats[m.p2].games++;
+                        if (s2 > s1) playerStats[m.p2].w++; else playerStats[m.p2].l++;
+                        if (d.getTime() > playerStats[m.p2].last_ts) playerStats[m.p2].last_ts = d.getTime();
+                    }
+                }
+            });
+
+            const rows = [];
+            Object.keys(playerStats).forEach(name => {
+                const stats = playerStats[name];
+                let histElo = 0;
+                const hist = GLOBAL_DATA.history[name];
+                if (hist && hist.length > 0) {
+                    let found = false;
+                    for (let i = hist.length - 1; i >= 0; i--) {
+                        const hDate = new Date(hist[i].x);
+                        if (hDate <= endDate) {
+                            histElo = hist[i].y;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if(!found) histElo = 0; 
+                }
+
+                if (stats.games > 0 || histElo > 0) {
+                    const win_pct = stats.games > 0 ? ((stats.w / stats.games) * 100).toFixed(1) : "0.0";
+                    const lastDateStr = stats.last_ts > 0 ? new Date(stats.last_ts).toLocaleDateString("en-GB") : "-"; 
+                    
+                    rows.push({
+                        name: name,
+                        elo: histElo,
+                        win_pct: win_pct,
+                        games: stats.games,
+                        last: lastDateStr
+                    });
+                }
+            });
+
+            rows.sort((a,b) => b.elo - a.elo);
+            rows.forEach((r, i) => r.rank = i + 1);
+            return rows;
+        }
+
+        function renderMainTable(dataObj) {
+            const tData = dataObj.map(p => [
+                p.rank,
+                `<div class="d-flex align-items-center justify-content-between">
+                    <a class="player-link" onclick="openH2H('${p.name}')">${p.name}</a>
+                    <span class="timeline-btn" onclick="openTimeline('${p.name}')" title="Match History">📜</span>
+                 </div>`,
+                p.elo,
+                p.win_pct + "%",
+                p.games,
+                p.last
+            ]);
+
+            if (MAIN_TABLE) {
+                MAIN_TABLE.clear().rows.add(tData).draw();
+            } else {
+                MAIN_TABLE = $('#ratingTable').DataTable({
+                    data: tData,
+                    pageLength: 25,
+                    lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+                    responsive: true,
+                    order: [[ 2, "desc" ]], 
+                    columnDefs: [
+                        { targets: 0, className: 'rank-cell' },
+                        { targets: 2, render: (d) => `<span class="elo-badge">${d}</span>` }
+                    ]
+                });
+            }
+        }
+
+        // --- CALCULATORS SETUP ---
+        function setupCalculators() {
+            const names = GLOBAL_DATA.leaderboard.map(p => p.name).sort();
+            names.forEach(n => {
+                $('#player-select').append(new Option(n, n));
+                $('#calc-p1').append(new Option(n, n));
+                $('#calc-p2').append(new Option(n, n));
+                $('#tourney-players').append(new Option(n, n));
+            });
+
+            $('.select2-single').select2({ width: '100%', theme: 'bootstrap-5' });
+            $('#player-select').select2({ placeholder: "Select players...", width: '100%', theme: 'bootstrap-5' });
+            $('#tourney-players').select2({ placeholder: "Select participants...", width: '100%', theme: 'bootstrap-5' });
+
+            const top5 = GLOBAL_DATA.leaderboard.slice(0, 5).map(p => p.name);
+            $('#player-select').val(top5).trigger('change');
+            updateChart();
+            $('#player-select').on('change', updateChart);
+        }
+
+        // --- CHART LOGIC ---
+        function updateChart() {
+            const ctx = document.getElementById('historyChart').getContext('2d');
+            const selected = $('#player-select').val();
+            const colors = ['#0d6efd', '#dc3545', '#198754', '#fd7e14', '#6610f2', '#0dcaf0', '#20c997', '#d63384'];
+            
+            if (Object.keys(GLOBAL_DATA.history).length === 0) return;
+            
+            const datasets = selected.map((name, i) => ({
+                label: name, 
+                data: GLOBAL_DATA.history[name], 
+                borderColor: colors[i % colors.length], 
+                backgroundColor: colors[i % colors.length], 
+                borderWidth: 2, 
+                pointRadius: 0, 
+                tension: 0.3
+            })).filter(d => d.data);
+
+            if(CHART_INSTANCE) CHART_INSTANCE.destroy();
+            CHART_INSTANCE = new Chart(ctx, { 
+                type: 'line', 
+                data: { datasets: datasets }, 
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    interaction: { mode: 'index', intersect: false },
+                    scales: { x: { type: 'time', time: { unit: 'month' } } } 
+                } 
+            });
+        }
+
+        // --- H2H CALCULATOR ---
+        function calculateWin() {
+            const p1Name = $('#calc-p1').val();
+            const p2Name = $('#calc-p2').val();
+            if(!p1Name || !p2Name || p1Name === p2Name) return;
+
+            const p1Obj = GLOBAL_DATA.leaderboard.find(p => p.name === p1Name);
+            const p2Obj = GLOBAL_DATA.leaderboard.find(p => p.name === p2Name);
+            
+            const elo1 = p1Obj ? p1Obj.elo : 1500;
+            const elo2 = p2Obj ? p2Obj.elo : 1500;
+
+            $('#elo-p1').text(elo1); $('#elo-p2').text(elo2);
+            
+            const bestOf = parseInt($('#sets-input').val());
+            const target = Math.ceil(bestOf / 2);
+            
+            const p = 1 / (1 + Math.pow(10, (elo2 - elo1) / 400));
+            
+            let prob1 = 0; 
+            const scores = [];
+            
+            for (let k=0; k<target; k++) { 
+                const w = combinations(target+k-1, k) * Math.pow(p, target) * Math.pow(1-p, k); 
+                prob1 += w; 
+                scores.push({s:`${target}-${k}`, p:w, w:p1Name}); 
+            }
+            
+            for (let k=0; k<target; k++) { 
+                const w = combinations(target+k-1, k) * Math.pow(1-p, target) * Math.pow(p, k); 
+                scores.push({s:`${k}-${target}`, p:w, w:p2Name}); 
+            }
+            
+            scores.sort((a,b)=>b.p-a.p);
+            
+            const pct1 = (prob1 * 100).toFixed(1);
+            
+            $('#bar-p1').css('width', pct1+'%').text(p1Name); 
+            $('#bar-p2').css('width', (100-pct1)+'%').text(p2Name);
+            $('#prob-p1').text(pct1+'%'); 
+            $('#prob-p2').text((100-pct1).toFixed(1)+'%');
+            
+            $('#score-probs').empty();
+            scores.slice(0, 5).forEach(sc => { 
+                let clr = sc.w === p1Name ? 'text-primary' : 'text-warning'; 
+                $('#score-probs').append(`<li class="list-group-item d-flex justify-content-between"><span class="${clr} fw-bold">${sc.s} (${sc.w})</span><span class="badge bg-secondary rounded-pill">${(sc.p*100).toFixed(1)}%</span></li>`); 
+            });
+            $('#result-area').fadeIn();
+        }
+
+        function combinations(n, r) { 
+            if (r===0 || r===n) return 1; 
+            if (r>n) return 0; 
+            let res = 1; 
+            for (let i=1; i<=r; i++) res = res * (n-i+1)/i; 
+            return res; 
+        }
+
+        // --- TOURNAMENT SIMULATION ---
+        function runTournamentSim() {
+            const selectedNames = $('#tourney-players').val();
+            if (!selectedNames || selectedNames.length < 2) {
+                alert("Please select at least 2 players.");
+                return;
+            }
+
+            $('#btn-sim-tourney').prop('disabled', true);
+            $('#tourney-loader').show();
+            $('#tourney-results').hide();
+
+            const players = selectedNames.map(n => {
+                const pObj = GLOBAL_DATA.leaderboard.find(x => x.name === n);
+                return { name: n, elo: pObj ? pObj.elo : 1500, wins: 0 };
+            });
+
+            setTimeout(() => {
+                // INCREASED ITERATIONS: 10,000 for better accuracy on low %
+                const ITERATIONS = 10000;
+                const winCounts = {};
+                players.forEach(p => winCounts[p.name] = 0);
+
+                const useGroups = players.length > 10;
+                
+                for(let i=0; i<ITERATIONS; i++) {
+                    const winner = useGroups ? simulateGroupKnockout(players) : simulateRoundRobin(players);
+                    winCounts[winner]++;
+                }
+
+                const results = players.map(p => ({
+                    name: p.name,
+                    elo: p.elo,
+                    pct: (winCounts[p.name] / ITERATIONS * 100).toFixed(2) // Changed to 2 decimals for precision
+                }));
+
+                // UPDATED SORTING: Sort by %, then by Elo if % is tied
+                results.sort((a,b) => {
+                    const pctDiff = parseFloat(b.pct) - parseFloat(a.pct);
+                    if (Math.abs(pctDiff) > 0) return pctDiff; // If % differs, use %
+                    return b.elo - a.elo; // If % is same, higher Elo wins
+                });
+
+                $('#tourney-table-body').empty();
+                results.forEach((r, idx) => {
+                    let cls = "";
+                    if(idx === 0) cls = "table-success fw-bold";
+                    else if(idx === 1) cls = "fw-bold";
+                    
+                    $('#tourney-table-body').append(`
+                        <tr class="${cls}">
+                            <td>${idx+1}</td>
+                            <td>${r.name}</td>
+                            <td class="text-center"><span class="badge bg-light text-dark border">${r.elo}</span></td>
+                            <td class="text-center">${r.pct}%</td>
+                        </tr>
+                    `);
+                });
+
+                const formatText = useGroups ? 
+                    `Groups (Top 2 Advance) + Single Elimination` : 
+                    `Round Robin (League Table)`;
+                    
+                $('#sim-details').text(`Format: ${formatText} | Simulated ${ITERATIONS.toLocaleString()} times.`);
+                $('#tourney-results').fadeIn();
+                $('#btn-sim-tourney').prop('disabled', false);
+                $('#tourney-loader').hide();
+            }, 100);
+        }
+
+        function getMatchWinner(p1, p2) {
+            const p = 1 / (1 + Math.pow(10, (p2.elo - p1.elo) / 400));
+            let s1 = 0, s2 = 0;
+            // Best of 5
+            while(s1 < 3 && s2 < 3) {
+                if(Math.random() < p) s1++; else s2++;
+            }
+            return s1 === 3 ? p1 : p2;
+        }
+
+        function simulateRoundRobin(players) {
+            const table = players.map(p => ({ ...p, pts: 0 }));
+            
+            for(let i=0; i<table.length; i++) {
+                for(let j=i+1; j<table.length; j++) {
+                    const w = getMatchWinner(table[i], table[j]);
+                    if(w.name === table[i].name) table[i].pts++;
+                    else table[j].pts++;
+                }
+            }
+            table.sort((a,b) => b.pts - a.pts || b.elo - a.elo);
+            return table[0].name;
+        }
+
+        function simulateGroupKnockout(players) {
+            const seeded = [...players].sort((a,b) => b.elo - a.elo);
+            const numGroups = Math.ceil(seeded.length / 5); 
+            const groups = Array.from({length: numGroups}, () => []);
+
+            seeded.forEach((p, i) => {
+                const gIdx = i % numGroups;
+                groups[gIdx].push({ ...p, pts: 0 });
+            });
+
+            const advancers = [];
+            groups.forEach(g => {
+                for(let i=0; i<g.length; i++) {
+                    for(let j=i+1; j<g.length; j++) {
+                        const w = getMatchWinner(g[i], g[j]);
+                        if(w.name === g[i].name) g[i].pts++; else g[j].pts++;
+                    }
+                }
+                g.sort((a,b) => b.pts - a.pts || b.elo - a.elo);
+                if(g[0]) advancers.push(g[0]);
+                if(g[1]) advancers.push(g[1]);
+            });
+
+            let currentRound = advancers.sort((a,b) => b.elo - a.elo);
+
+            while(currentRound.length > 1) {
+                const nextRound = [];
+                if(currentRound.length % 2 !== 0) {
+                    nextRound.push(currentRound.shift());
+                }
+                const matches = currentRound.length / 2;
+                for(let i=0; i<matches; i++) {
+                    const pA = currentRound[i];
+                    const pB = currentRound[currentRound.length - 1 - i];
+                    nextRound.push(getMatchWinner(pA, pB));
+                }
+                currentRound = nextRound;
+            }
+            return currentRound[0].name;
+        }
+
+        // --- COMMON UI LOGIC ---
         function openTimeline(player) {
             document.getElementById('timelineTitle').innerText = "History: " + player;
             const tbody = document.getElementById('timelineBody');
             tbody.innerHTML = "";
+
             const myMatches = [];
             const playerHistory = GLOBAL_DATA.history[player];
 
@@ -378,57 +777,66 @@
 
                 if (opponent) {
                     const scoreParts = m.sc.split('-');
-                    const s1 = parseInt(scoreParts[0]), s2 = parseInt(scoreParts[1]);
+                    const s1 = parseInt(scoreParts[0]);
+                    const s2 = parseInt(scoreParts[1]);
+                    
                     let myScore = isP1 ? s1 : s2;
                     let oppScore = isP1 ? s2 : s1;
-                    let result = myScore > oppScore ? "Win" : (myScore < oppScore ? "Loss" : "Draw");
+                    
+                    let result = "Draw";
+                    if (myScore > oppScore) result = "Win";
+                    if (myScore < oppScore) result = "Loss";
 
-                    let myElo = "-", oppElo = "-";
+                    let myElo = "-";
                     if (playerHistory) {
                         const entry = playerHistory.find(h => h.x === m.d);
                         if (entry) myElo = entry.y;
-                    } else {
-                         // Fallback BT Static
-                         const pObj = GLOBAL_DATA.leaderboard.find(p => p.name === player);
-                         if (pObj) myElo = pObj.elo;
                     }
 
+                    let oppElo = "-";
                     if (GLOBAL_DATA.history[opponent]) {
                         const entry = GLOBAL_DATA.history[opponent].find(h => h.x === m.d);
                         if (entry) oppElo = entry.y;
-                    } else {
-                         const oppObj = GLOBAL_DATA.leaderboard.find(p => p.name === opponent);
-                         if (oppObj) oppElo = oppObj.elo;
                     }
 
                     myMatches.push({
-                        dateStr: m.d, opp: opponent, res: result, 
-                        score: `${myScore} - ${oppScore}`, elo: myElo, oppElo: oppElo 
+                        dateStr: m.d, 
+                        opp: opponent,
+                        res: result,
+                        score: `${myScore} - ${oppScore}`,
+                        elo: myElo,
+                        oppElo: oppElo 
                     });
                 }
             });
 
             myMatches.sort((a,b) => new Date(b.dateStr) - new Date(a.dateStr));
 
-            if (myMatches.length === 0) tbody.innerHTML = "<tr><td colspan='6' class='text-center'>No matches found.</td></tr>";
-            else {
+            if (myMatches.length === 0) {
+                tbody.innerHTML = "<tr><td colspan='6' class='text-center'>No matches found.</td></tr>";
+            } else {
                 myMatches.forEach(m => {
-                    let rowClass = "", badgeClass = "bg-secondary";
+                    let rowClass = "";
+                    let badgeClass = "bg-secondary";
                     if (m.res === "Win") { rowClass = "row-win"; badgeClass = "bg-success"; }
                     if (m.res === "Loss") { rowClass = "row-loss"; badgeClass = "bg-danger"; }
-                    tbody.innerHTML += `<tr class="${rowClass}">
+
+                    tbody.innerHTML += `
+                    <tr class="${rowClass}">
                         <td>${m.dateStr}</td>
                         <td class="text-center"><span class="hist-elo-badge">${m.elo}</span></td>
                         <td class="fw-bold">${m.opp}</td>
                         <td class="text-center"><span class="hist-elo-badge">${m.oppElo}</span></td>
                         <td class="text-center"><span class="badge ${badgeClass}">${m.res}</span></td>
-                        <td class="text-center fw-bold">${m.score}</td></tr>`;
+                        <td class="text-center fw-bold">${m.score}</td>
+                    </tr>`;
                 });
             }
-            new bootstrap.Modal(document.getElementById('timelineModal')).show();
+
+            const modal = new bootstrap.Modal(document.getElementById('timelineModal'));
+            modal.show();
         }
 
-        // --- H2H ---
         function openH2H(player) {
             document.getElementById('h2hTitle').innerText = "H2H: " + player;
             const oppStats = {};
@@ -441,7 +849,8 @@
                     if (!oppStats[opponent]) oppStats[opponent] = { w:0, l:0, d:0, games:0, sw:0, sl:0, history: [] };
                     const score = m.sc.split('-');
                     const s1 = parseInt(score[0]), s2 = parseInt(score[1]);
-                    let pWins = isP1 ? s1 : s2, pLoss = isP1 ? s2 : s1;
+                    let pWins = isP1 ? s1 : s2;
+                    let pLoss = isP1 ? s2 : s1;
                     if (pWins > pLoss) oppStats[opponent].w++;
                     else if (pLoss > pWins) oppStats[opponent].l++;
                     else oppStats[opponent].d++;
@@ -456,25 +865,22 @@
             for (const [oppName, s] of Object.entries(oppStats)) {
                 const oppObj = GLOBAL_DATA.leaderboard.find(x => x.name === oppName);
                 const elo = oppObj ? oppObj.elo : "-";
-                const safeP1 = player.replace(/'/g, "\\'");
-                const safeP2 = oppName.replace(/'/g, "\\'");
                 const histStr = encodeURIComponent(JSON.stringify(s.history));
                 rows.push([
                     oppName, elo, s.games, s.w, s.l,
-                    `<span class="score-link" onclick="showMatches('${safeP1}', '${safeP2}', '${histStr}')">${s.w} - ${s.l}</span>`,
-                    `${s.sw} - ${s.sl}`
+                    `<span class="score-link" onclick="showMatches('${player}', '${oppName}', '${histStr}')">${s.w} - ${s.l}</span>`
                 ]);
             }
 
             if (H2H_TABLE) H2H_TABLE.destroy();
             H2H_TABLE = $('#h2hTable').DataTable({
                 data: rows, destroy: true, paging: false, info: false, scrollY: "50vh", scrollCollapse: true, order: [[ 1, "desc" ]], autoWidth: false,
-                columnDefs: [ { targets: 0, className: "fw-bold text-start ps-3", width: "25%" }, { targets: [1,2,3,4,5,6], className: "text-center" } ]
+                columnDefs: [ { targets: 0, className: "fw-bold text-start ps-3", width: "30%" }, { targets: [1,2,3,4,5], className: "text-center" } ]
             });
 
             const modalEl = document.getElementById('h2hModal');
-            if (!h2hModalInstance) h2hModalInstance = new bootstrap.Modal(modalEl);
-            h2hModalInstance.show();
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
             modalEl.addEventListener('shown.bs.modal', function () { if (H2H_TABLE) { setTimeout(() => { H2H_TABLE.columns.adjust().draw(); }, 150); } }, { once: true });
         }
 
@@ -490,38 +896,6 @@
             const modal = new bootstrap.Modal(document.getElementById('matchesModal'));
             modal.show();
         }
-
-        function updateChart() {
-            const ctx = document.getElementById('historyChart').getContext('2d');
-            const selected = $('#player-select').val();
-            const colors = ['#0d6efd', '#dc3545', '#198754', '#fd7e14', '#6610f2'];
-            if (Object.keys(GLOBAL_DATA.history).length === 0) { if(CHART_INSTANCE) CHART_INSTANCE.destroy(); return; }
-            const datasets = selected.map((name, i) => ({
-                label: name, data: GLOBAL_DATA.history[name], borderColor: colors[i % colors.length], backgroundColor: colors[i % colors.length], borderWidth: 2, pointRadius: 0, tension: 0.3
-            })).filter(d => d.data);
-            if(CHART_INSTANCE) CHART_INSTANCE.destroy();
-            CHART_INSTANCE = new Chart(ctx, { type: 'line', data: { datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: 'month' } } }, plugins: { tooltip: { mode: 'index', intersect: false } } } });
-        }
-
-        function calculateWin() {
-            const p1 = GLOBAL_DATA.leaderboard.find(p => p.name === $('#calc-p1').val());
-            const p2 = GLOBAL_DATA.leaderboard.find(p => p.name === $('#calc-p2').val());
-            if(!p1 || !p2) return;
-            $('#elo-p1').text(p1.elo); $('#elo-p2').text(p2.elo);
-            const target = Math.ceil(parseInt($('#sets-input').val()) / 2);
-            const p = 1 / (1 + Math.pow(10, (p2.elo - p1.elo) / 400));
-            let prob1 = 0, scores = [];
-            for (let k=0; k<target; k++) { let w = combinations(target+k-1, k) * Math.pow(p, target) * Math.pow(1-p, k); prob1 += w; scores.push({s:`${target}-${k}`, p:w, w:p1.name}); }
-            for (let k=0; k<target; k++) { let w = combinations(target+k-1, k) * Math.pow(1-p, target) * Math.pow(p, k); scores.push({s:`${k}-${target}`, p:w, w:p2.name}); }
-            scores.sort((a,b)=>b.p-a.p);
-            const pct1 = (prob1 * 100).toFixed(1);
-            $('#bar-p1').css('width', pct1+'%').text(p1.name); $('#bar-p2').css('width', (100-pct1)+'%').text(p2.name);
-            $('#prob-p1').text(pct1+'%'); $('#prob-p2').text((100-pct1).toFixed(1)+'%');
-            $('#score-probs').empty();
-            scores.slice(0, 5).forEach(sc => { let clr = sc.w === p1.name ? 'text-primary' : 'text-warning'; $('#score-probs').append(`<li class="list-group-item d-flex justify-content-between"><span class="${clr} fw-bold">${sc.s} (${sc.w})</span><span class="badge bg-secondary rounded-pill">${(sc.p*100).toFixed(1)}%</span></li>`); });
-            $('#result-area').fadeIn();
-        }
-        function combinations(n, r) { if (r===0 || r===n) return 1; if (r>n) return 0; let res = 1; for (let i=1; i<=r; i++) res = res * (n-i+1)/i; return res; }
     </script>
 </body>
 </html>
